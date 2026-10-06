@@ -150,9 +150,9 @@ class YemotTranscriptionService:
         """
         try:
             print(f"[DEBUG] Starting transcription of: {audio_file_path}")
-            # העלאת הקובץ ל-Gemini עם mime_type מפורש
+            # העלאת הקובץ ל-Gemini עם mime_type מפורש ב-config
             with open(audio_file_path, 'rb') as f:
-                uploaded_file = self.client.files.upload(file=f, mime_type='audio/wav')
+                uploaded_file = self.client.files.upload(file=f, config={'mime_type': 'audio/wav'})
             print(f"[DEBUG] File uploaded to Gemini: {uploaded_file.name}")
             
             # תמלול הקובץ
