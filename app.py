@@ -121,7 +121,7 @@ class YemotTranscriptionService:
             
             # תמלול הקובץ
             response = self.client.models.generate_content(
-                model='gemini-3-flash-preview',
+                model='gemini-3.5-flash-lite',
                 contents=[
                     "Transcribe the following audio file accurately. The audio contains speech in Aramaic, Hebrew, and/or Biblical Hebrew - possibly mixed together in the same recording. The speech may be pronounced with Ashkenazi or Hasidic Jewish pronunciation. Please transcribe exactly what is said, preserving the original language, words, and pronunciation. Do not translate or summarize. Return ONLY the transcription text without any explanations, notes, or additional content.",
                     types.Part.from_uri(
@@ -241,7 +241,7 @@ def transcribe():
         with transcription_lock:
             if is_transcribing:
                 logger.debug("Transcription already in progress, ignoring duplicate request")
-                return "id_list_message=already_transcribing"
+                return "יש כרגע תמלול פעיל, אנא נסה שוב בעוד מספר דקות"
             is_transcribing = True
 
         # תמלול ברקע
@@ -259,7 +259,7 @@ def transcribe():
         thread.daemon = True
         thread.start()
 
-        return "id_list_message=file_sent_for_transcription"
+        return "הקובץ נשלח בהצלחה לתמלול"
 
     except Exception as e:
         logger.error(f"שגיאה ב-transcribe: {e}")
