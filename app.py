@@ -56,63 +56,18 @@ class YemotTranscriptionService:
         self.base_url = "https://www.call2all.co.il/ym/api/"
         self.client = genai.Client(api_key=gemini_api_key)
     
-    def get_latest_file_from_extension(self, extension: str) -> str:
+    def download_file_from_path(self, file_path: str):
         """
-        מקבל את הקובץ האחרון משלוחה מסוימת לפי סדר כרונולוגי
-        """
-        url = f"{self.base_url}GetIVR2Dir"
-        params = {
-            'token': self.yemot_token,
-            'path': f'ivr2:{extension}'
-        }
-        
-        try:
-            response = requests.post(url, data=params, verify=False)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('responseStatus') == 'OK':
-                    files = data.get('files', [])
-                    logger.debug(f"Found {len(files)} files in extension {extension}")
-                    if files:
-                        # מיון לפי תאריך וזמן
-                        files_with_dates = []
-                        for f in files:
-                            if 'date' in f:
-                                try:
-                                    # הפורמט הוא DD/MM/YYYY HH:MM
-                                    dt = datetime.strptime(f['date'], '%d/%m/%Y %H:%M')
-                                    files_with_dates.append((dt, f['name']))
-                                except:
-                                    pass
-                        
-                        if files_with_dates:
-                            files_with_dates.sort(key=lambda x: x[0], reverse=True)
-                            latest = files_with_dates[0][1]
-                            logger.debug(f"Latest file: {latest}")
-                            return latest
-                        else:
-                            logger.debug("No files with valid dates found")
-                else:
-                    logger.debug(f"API returned status: {data.get('responseStatus')}")
-            else:
-                    logger.debug(f"HTTP status: {response.status_code}")
-        except Exception as e:
-            logger.error(f"שגיאה בקבלת רשימת קבצים: {e}")
-        
-        return None
-    
-    def download_file(self, extension: str, file_name: str) -> bytes:
-        """
-        מוריד קובץ מה-API של ימות
+        מוריד קובץ מה-API של ימות מנתיב מלא
         """
         url = f"{self.base_url}DownloadFile"
         params = {
             'token': self.yemot_token,
-            'path': f'ivr2:{extension}/{file_name}'
+            'path': file_path
         }
-        
+
         try:
-            logger.debug(f"Downloading file: {file_name} from extension {extension}")
+            logger.debug(f"Downloading file from path: {file_path}")
             response = requests.post(url, data=params, verify=False)
             logger.debug(f"Download response status: {response.status_code}")
             if response.status_code == 200:
@@ -213,47 +168,43 @@ class YemotTranscriptionService:
             except:
                 pass
     
-    def process_transcription(self, source_extension: str, target_extension: str):
+    def process_transcription_from_path(self, file_path: str, target_extension: str) -> str:
         """
-        מעבד תמלול מלא: הורדה -> תמלול -> העלאה
+        מעבדת תמלול מנתיב קובץ מלא
         """
-        # קבלת הקובץ האחרון משלוחת המקור
-        latest_file = self.get_latest_file_from_extension(source_extension)
-        
-        if not latest_file:
-            return "id_list_message=no_file_found"
-        
+        logger.debug(f"Processing transcription from path: {file_path}")
+
         # הורדת הקובץ
-        audio_data = self.download_file(source_extension, latest_file)
-        
+        audio_data = self.download_file_from_path(file_path)
+
         if not audio_data:
-            return "הורדת הקובץ מימות המשיח נכשלה"
-        
+            return "id_list_message=download_failed"
+
         # שמירת הקובץ באופן זמני
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
             temp_file.write(audio_data)
             temp_file_path = temp_file.name
-        
+
         try:
             # תמלול הקובץ
             transcription = self.transcribe_audio(temp_file_path)
-            
+
             if not transcription:
-                return "התמלול נכשל"
-            
+                return "id_list_message=transcription_failed"
+
             # יצירת שם קובץ עם timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             tts_filename = f"transcription_{timestamp}.tts"
-            
+
             # העלאת התמלול כקובץ TTS לשלוחת היעד
             upload_success = self.upload_tts_file(target_extension, tts_filename, transcription)
-            
+
             if not upload_success:
-                return "העלאת התמלול לימות המשיח נכשלה"
-            
+                return "id_list_message=upload_failed"
+
             # הצלחה
-            return "התהליך הושלם בהצלחה"
-            
+            return "id_list_message=success"
+
         finally:
             # מחיקת הקובץ הזמני
             try:
@@ -267,11 +218,24 @@ service = YemotTranscriptionService(YMOT_TOKEN, GEMINI_API_KEY)
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
     """
-    נקודת קצה לתמלול - מורידה את הקובץ האחרון משלוחה 7 ומעלה את התמלול לשלוחה 8
+    נקודת קצה לתמלול - מקבלת נתיב קובץ ומעלה את התמלול לשלוחה 8
     """
     global is_transcribing
     try:
         logger.debug("Transcribe endpoint called")
+
+        # קבלת הנתיב מהפרמטר file
+        file_path = request.form.get('file')
+
+        if not file_path:
+            logger.debug("No file path provided")
+            return "id_list_message=no_file_path"
+
+        logger.debug(f"File path received: {file_path}")
+
+        # הוספת ivr2: לנתיב
+        full_path = f"ivr2:{file_path}"
+        logger.debug(f"Full path: {full_path}")
 
         # בדיקה אם כבר יש תמלול פעיל
         with transcription_lock:
@@ -280,23 +244,12 @@ def transcribe():
                 return "id_list_message=already_transcribing"
             is_transcribing = True
 
-        # קבלת הקובץ האחרון משלוחה 7
-        latest_file = service.get_latest_file_from_extension('7')
-
-        if not latest_file:
-            logger.debug("No file found in extension 7")
-            with transcription_lock:
-                is_transcribing = False
-            return "id_list_message=no_file_found"
-
-        logger.debug(f"Latest file found: {latest_file}")
-
         # תמלול ברקע
         def process_in_background():
             global is_transcribing
             logger.debug("Starting background transcription process")
             try:
-                result = service.process_transcription('7', '8')
+                result = service.process_transcription_from_path(full_path, '8')
                 logger.debug(f"Background transcription result: {result}")
             finally:
                 with transcription_lock:
