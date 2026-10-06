@@ -61,8 +61,10 @@ class YemotTranscriptionService:
             response = requests.post(url, data=params, verify=False)
             if response.status_code == 200:
                 data = response.json()
+                print(f"[DEBUG] GetIVR2Dir response: {data}")
                 if data.get('responseStatus') == 'OK':
                     files = data.get('files', [])
+                    print(f"[DEBUG] Found {len(files)} files in extension {extension}")
                     if files:
                         # מיון לפי תאריך וזמן
                         files_with_dates = []
@@ -77,9 +79,17 @@ class YemotTranscriptionService:
                         
                         if files_with_dates:
                             files_with_dates.sort(key=lambda x: x[0], reverse=True)
-                            return files_with_dates[0][1]
+                            latest = files_with_dates[0][1]
+                            print(f"[DEBUG] Latest file: {latest}")
+                            return latest
+                        else:
+                            print(f"[DEBUG] No files with valid dates found")
+                else:
+                    print(f"[DEBUG] API returned status: {data.get('responseStatus')}")
+            else:
+                print(f"[DEBUG] HTTP status: {response.status_code}")
         except Exception as e:
-            print(f"שגיאה בקבלת רשימת קבצים: {e}")
+            print(f"[ERROR] שגיאה בקבלת רשימת קבצים: {e}")
         
         return None
     
@@ -94,12 +104,17 @@ class YemotTranscriptionService:
         }
         
         try:
+            print(f"[DEBUG] Downloading file: {file_name} from extension {extension}")
             response = requests.post(url, data=params, verify=False)
+            print(f"[DEBUG] Download response status: {response.status_code}")
             if response.status_code == 200:
+                print(f"[DEBUG] Downloaded {len(response.content)} bytes")
                 return response.content
+            else:
+                print(f"[DEBUG] Download failed with status {response.status_code}")
             return None
         except Exception as e:
-            print(f"שגיאה בהורדת קובץ: {e}")
+            print(f"[ERROR] שגיאה בהורדת קובץ: {e}")
             return None
     
     def upload_tts_file(self, extension: str, file_name: str, content: str):
@@ -115,13 +130,19 @@ class YemotTranscriptionService:
         }
         
         try:
+            print(f"[DEBUG] Uploading TTS file: {file_name} to extension {extension}")
+            print(f"[DEBUG] Content length: {len(content)} characters")
             response = requests.post(url, data=params, verify=False)
+            print(f"[DEBUG] Upload response status: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()
+                print(f"[DEBUG] Upload response: {data}")
                 return data.get('responseStatus') == 'OK'
+            else:
+                print(f"[DEBUG] Upload failed with status {response.status_code}")
             return False
         except Exception as e:
-            print(f"שגיאה בהעלאת קובץ: {e}")
+            print(f"[ERROR] שגיאה בהעלאת קובץ: {e}")
             return False
     
     def transcribe_audio(self, audio_file_path: str) -> str:
@@ -129,9 +150,11 @@ class YemotTranscriptionService:
         מתמלל קובץ אודיו ב-Gemini עם תמיכה בארמית, עברית ולשון הקודש
         """
         try:
+            print(f"[DEBUG] Starting transcription of: {audio_file_path}")
             # העלאת הקובץ ל-Gemini
             with open(audio_file_path, 'rb') as f:
                 uploaded_file = self.client.files.upload(file=f)
+            print(f"[DEBUG] File uploaded to Gemini: {uploaded_file.name}")
             
             # תמלול הקובץ
             response = self.client.models.generate_content(
@@ -147,16 +170,21 @@ class YemotTranscriptionService:
             
             # חילוץ התמלול מהתגובה
             transcription = response.text.strip()
+            print(f"[DEBUG] Transcription completed. Length: {len(transcription)} characters")
+            print(f"[DEBUG] Transcription preview: {transcription[:100]}...")
             return transcription
             
         except Exception as e:
-            print(f"שגיאה בתמלול: {e}")
+            print(f"[ERROR] שגיאה בתמלול: {e}")
+            import traceback
+            traceback.print_exc()
             return None
         finally:
             # מחיקת הקובץ המועלה מ-Gemini
             try:
                 if 'uploaded_file' in locals():
                     self.client.files.delete(name=uploaded_file.name)
+                    print(f"[DEBUG] Deleted file from Gemini")
             except:
                 pass
     
