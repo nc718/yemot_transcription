@@ -3,11 +3,16 @@ import ssl
 import sys
 import tempfile
 import threading
+import logging
 from datetime import datetime
 from flask import Flask, request
 import requests
 from google import genai
 from google.genai import types
+
+# הגדרת logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # הגדרת UTF-8 ל-Windows
 if sys.platform == 'win32':
@@ -63,7 +68,7 @@ class YemotTranscriptionService:
                 data = response.json()
                 if data.get('responseStatus') == 'OK':
                     files = data.get('files', [])
-                    print(f"[DEBUG] Found {len(files)} files in extension {extension}")
+                    logger.debug(f"Found {len(files)} files in extension {extension}")
                     if files:
                         # מיון לפי תאריך וזמן
                         files_with_dates = []
@@ -79,16 +84,16 @@ class YemotTranscriptionService:
                         if files_with_dates:
                             files_with_dates.sort(key=lambda x: x[0], reverse=True)
                             latest = files_with_dates[0][1]
-                            print(f"[DEBUG] Latest file: {latest}")
+                            logger.debug(f"Latest file: {latest}")
                             return latest
                         else:
-                            print(f"[DEBUG] No files with valid dates found")
+                            logger.debug("No files with valid dates found")
                 else:
-                    print(f"[DEBUG] API returned status: {data.get('responseStatus')}")
+                    logger.debug(f"API returned status: {data.get('responseStatus')}")
             else:
-                print(f"[DEBUG] HTTP status: {response.status_code}")
+                    logger.debug(f"HTTP status: {response.status_code}")
         except Exception as e:
-            print(f"[ERROR] שגיאה בקבלת רשימת קבצים: {e}")
+            logger.error(f"שגיאה בקבלת רשימת קבצים: {e}")
         
         return None
     
@@ -103,17 +108,17 @@ class YemotTranscriptionService:
         }
         
         try:
-            print(f"[DEBUG] Downloading file: {file_name} from extension {extension}")
+            logger.debug(f"Downloading file: {file_name} from extension {extension}")
             response = requests.post(url, data=params, verify=False)
-            print(f"[DEBUG] Download response status: {response.status_code}")
+            logger.debug(f"Download response status: {response.status_code}")
             if response.status_code == 200:
-                print(f"[DEBUG] Downloaded {len(response.content)} bytes")
+                logger.debug(f"Downloaded {len(response.content)} bytes")
                 return response.content
             else:
-                print(f"[DEBUG] Download failed with status {response.status_code}")
+                logger.debug(f"Download failed with status {response.status_code}")
             return None
         except Exception as e:
-            print(f"[ERROR] שגיאה בהורדת קובץ: {e}")
+            logger.error(f"שגיאה בהורדת קובץ: {e}")
             return None
     
     def upload_tts_file(self, extension: str, file_name: str, content: str):
@@ -129,19 +134,19 @@ class YemotTranscriptionService:
         }
         
         try:
-            print(f"[DEBUG] Uploading TTS file: {file_name} to extension {extension}")
-            print(f"[DEBUG] Content length: {len(content)} characters")
+            logger.debug(f"Uploading TTS file: {file_name} to extension {extension}")
+            logger.debug(f"Content length: {len(content)} characters")
             response = requests.post(url, data=params, verify=False)
-            print(f"[DEBUG] Upload response status: {response.status_code}")
+            logger.debug(f"Upload response status: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()
-                print(f"[DEBUG] Upload response: {data}")
+                logger.debug(f"Upload response: {data}")
                 return data.get('responseStatus') == 'OK'
             else:
-                print(f"[DEBUG] Upload failed with status {response.status_code}")
+                logger.debug(f"Upload failed with status {response.status_code}")
             return False
         except Exception as e:
-            print(f"[ERROR] שגיאה בהעלאת קובץ: {e}")
+            logger.error(f"שגיאה בהעלאת קובץ: {e}")
             return False
     
     def transcribe_audio(self, audio_file_path: str) -> str:
@@ -149,15 +154,15 @@ class YemotTranscriptionService:
         מתמלל קובץ אודיו ב-Gemini עם תמיכה בארמית, עברית ולשון הקודש
         """
         try:
-            print(f"[DEBUG] Starting transcription of: {audio_file_path}")
+            logger.debug(f"Starting transcription of: {audio_file_path}")
             # העלאת הקובץ ל-Gemini עם mime_type מפורש ב-config
             with open(audio_file_path, 'rb') as f:
                 uploaded_file = self.client.files.upload(file=f, config={'mime_type': 'audio/wav'})
-            print(f"[DEBUG] File uploaded to Gemini: {uploaded_file.name}")
+            logger.debug(f"File uploaded to Gemini: {uploaded_file.name}")
             
             # תמלול הקובץ
             response = self.client.models.generate_content(
-                model='gemini-3.5-flash',
+                model='gemini-3.5-transcribe',
                 contents=[
                     "Transcribe the audio accurately. The audio may contain Aramaic, Hebrew, and/or Biblical Hebrew, possibly mixed together. Return ONLY the transcription text without any explanations, notes, or additional content.",
                     types.Part.from_uri(
@@ -170,15 +175,15 @@ class YemotTranscriptionService:
             # חילוץ התמלול מהתגובה
             if response and hasattr(response, 'text'):
                 transcription = response.text.strip()
-                print(f"[DEBUG] Transcription completed. Length: {len(transcription)} characters")
-                print(f"[DEBUG] Transcription preview: {transcription[:100]}...")
+                logger.debug(f"Transcription completed. Length: {len(transcription)} characters")
+                logger.debug(f"Transcription preview: {transcription[:100]}...")
                 return transcription
             else:
-                print(f"[ERROR] No valid response from Gemini")
+                logger.error("No valid response from Gemini")
                 return None
             
         except Exception as e:
-            print(f"[ERROR] שגיאה בתמלול: {e}")
+            logger.error(f"שגיאה בתמלול: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -187,7 +192,7 @@ class YemotTranscriptionService:
             try:
                 if 'uploaded_file' in locals():
                     self.client.files.delete(name=uploaded_file.name)
-                    print(f"[DEBUG] Deleted file from Gemini")
+                    logger.debug("Deleted file from Gemini")
             except:
                 pass
     
@@ -248,19 +253,19 @@ def transcribe():
     נקודת קצה לתמלול - מורידה את הקובץ האחרון משלוחה 7 ומעלה את התמלול לשלוחה 8
     """
     try:
-        print("[DEBUG] Transcribe endpoint called")
+        logger.debug("Transcribe endpoint called")
         # קבלת הקובץ האחרון משלוחה 7
         latest_file = service.get_latest_file_from_extension('7')
         
         if not latest_file:
-            print("[DEBUG] No file found in extension 7")
+            logger.debug("No file found in extension 7")
             return "id_list_message=no_file_found"
         
-        print(f"[DEBUG] Latest file found: {latest_file}")
+        logger.debug(f"Latest file found: {latest_file}")
         
         # תמלול סינכרוני לבדיקה
         result = service.process_transcription('7', '8')
-        print(f"[DEBUG] Transcription result: {result}")
+        logger.debug(f"Transcription result: {result}")
         
         if result == "id_list_message=success":
             return "id_list_message=file_sent_for_transcription"
@@ -268,7 +273,7 @@ def transcribe():
             return result
         
     except Exception as e:
-        print(f"[ERROR] שגיאה ב-transcribe: {e}")
+        logger.error(f"שגיאה ב-transcribe: {e}")
         import traceback
         traceback.print_exc()
         return "id_list_message=error"
