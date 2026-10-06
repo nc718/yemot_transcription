@@ -14,6 +14,10 @@ from google.genai import types
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# מניעת ריצה כפולה של תמלול
+transcription_lock = threading.Lock()
+is_transcribing = False
+
 # הגדרת UTF-8 ל-Windows
 if sys.platform == 'win32':
     import locale
@@ -265,22 +269,38 @@ def transcribe():
     """
     נקודת קצה לתמלול - מורידה את הקובץ האחרון משלוחה 7 ומעלה את התמלול לשלוחה 8
     """
+    global is_transcribing
     try:
         logger.debug("Transcribe endpoint called")
+
+        # בדיקה אם כבר יש תמלול פעיל
+        with transcription_lock:
+            if is_transcribing:
+                logger.debug("Transcription already in progress, ignoring duplicate request")
+                return "id_list_message=already_transcribing"
+            is_transcribing = True
+
         # קבלת הקובץ האחרון משלוחה 7
         latest_file = service.get_latest_file_from_extension('7')
 
         if not latest_file:
             logger.debug("No file found in extension 7")
+            with transcription_lock:
+                is_transcribing = False
             return "id_list_message=no_file_found"
 
         logger.debug(f"Latest file found: {latest_file}")
 
         # תמלול ברקע
         def process_in_background():
+            global is_transcribing
             logger.debug("Starting background transcription process")
-            result = service.process_transcription('7', '8')
-            logger.debug(f"Background transcription result: {result}")
+            try:
+                result = service.process_transcription('7', '8')
+                logger.debug(f"Background transcription result: {result}")
+            finally:
+                with transcription_lock:
+                    is_transcribing = False
 
         thread = threading.Thread(target=process_in_background)
         thread.daemon = True
@@ -292,6 +312,8 @@ def transcribe():
         logger.error(f"שגיאה ב-transcribe: {e}")
         import traceback
         traceback.print_exc()
+        with transcription_lock:
+            is_transcribing = False
         return "id_list_message=error"
 
 @app.route('/health', methods=['GET'])
