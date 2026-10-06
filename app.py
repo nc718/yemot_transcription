@@ -61,7 +61,6 @@ class YemotTranscriptionService:
             response = requests.post(url, data=params, verify=False)
             if response.status_code == 200:
                 data = response.json()
-                print(f"[DEBUG] GetIVR2Dir response: {data}")
                 if data.get('responseStatus') == 'OK':
                     files = data.get('files', [])
                     print(f"[DEBUG] Found {len(files)} files in extension {extension}")
@@ -151,9 +150,9 @@ class YemotTranscriptionService:
         """
         try:
             print(f"[DEBUG] Starting transcription of: {audio_file_path}")
-            # העלאת הקובץ ל-Gemini
+            # העלאת הקובץ ל-Gemini עם mime_type מפורש
             with open(audio_file_path, 'rb') as f:
-                uploaded_file = self.client.files.upload(file=f)
+                uploaded_file = self.client.files.upload(file=f, mime_type='audio/wav')
             print(f"[DEBUG] File uploaded to Gemini: {uploaded_file.name}")
             
             # תמלול הקובץ
