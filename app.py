@@ -158,13 +158,13 @@ class YemotTranscriptionService:
             # תמלול הקובץ
             response = self.client.models.generate_content(
                 model='gemini-3.5-transcribe',
-                contents=[types.Part.from_uri(
-                    file_uri=uploaded_file.uri,
-                    mime_type='audio/wav'
-                )],
-                config=types.GenerateContentConfig(
-                    system_instruction="Transcribe the audio accurately. The audio may contain Aramaic, Hebrew, and/or Biblical Hebrew, possibly mixed together. Return ONLY the transcription text without any explanations, notes, or additional content."
-                )
+                contents=[
+                    "Transcribe the audio accurately. The audio may contain Aramaic, Hebrew, and/or Biblical Hebrew, possibly mixed together. Return ONLY the transcription text without any explanations, notes, or additional content.",
+                    types.Part.from_uri(
+                        file_uri=uploaded_file.uri,
+                        mime_type='audio/wav'
+                    )
+                ]
             )
             
             # חילוץ התמלול מהתגובה
