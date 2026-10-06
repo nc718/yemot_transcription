@@ -168,10 +168,14 @@ class YemotTranscriptionService:
             )
             
             # חילוץ התמלול מהתגובה
-            transcription = response.text.strip()
-            print(f"[DEBUG] Transcription completed. Length: {len(transcription)} characters")
-            print(f"[DEBUG] Transcription preview: {transcription[:100]}...")
-            return transcription
+            if response and hasattr(response, 'text'):
+                transcription = response.text.strip()
+                print(f"[DEBUG] Transcription completed. Length: {len(transcription)} characters")
+                print(f"[DEBUG] Transcription preview: {transcription[:100]}...")
+                return transcription
+            else:
+                print(f"[ERROR] No valid response from Gemini")
+                return None
             
         except Exception as e:
             print(f"[ERROR] שגיאה בתמלול: {e}")
