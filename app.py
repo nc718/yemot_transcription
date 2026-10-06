@@ -257,7 +257,9 @@ def transcribe():
         # הודעה למשתמש שהקובץ נשלח לתמלול
         # תמלול ברקע
         def process_in_background():
-            service.process_transcription('7', '8')
+            print("[DEBUG] Starting background transcription process")
+            result = service.process_transcription('7', '8')
+            print(f"[DEBUG] Background transcription result: {result}")
         
         thread = threading.Thread(target=process_in_background)
         thread.daemon = True
@@ -266,7 +268,9 @@ def transcribe():
         return "id_list_message=file_sent_for_transcription"
         
     except Exception as e:
-        print(f"שגיאה: {e}")
+        print(f"[ERROR] שגיאה ב-transcribe: {e}")
+        import traceback
+        traceback.print_exc()
         return "id_list_message=error"
 
 @app.route('/health', methods=['GET'])
