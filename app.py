@@ -227,7 +227,7 @@ class YemotTranscriptionService:
         audio_data = self.download_file(source_extension, latest_file)
         
         if not audio_data:
-            return "id_list_message=download_failed"
+            return "הורדת הקובץ מימות המשיח נכשלה"
         
         # שמירת הקובץ באופן זמני
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
@@ -239,7 +239,7 @@ class YemotTranscriptionService:
             transcription = self.transcribe_audio(temp_file_path)
             
             if not transcription:
-                return "id_list_message=transcription_failed"
+                return "התמלול נכשל"
             
             # יצירת שם קובץ עם timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -249,10 +249,10 @@ class YemotTranscriptionService:
             upload_success = self.upload_tts_file(target_extension, tts_filename, transcription)
             
             if not upload_success:
-                return "id_list_message=upload_failed"
+                return "העלאת התמלול לימות המשיח נכשלה"
             
             # הצלחה
-            return "id_list_message=success"
+            return "התהליך הושלם בהצלחה"
             
         finally:
             # מחיקת הקובץ הזמני
