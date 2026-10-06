@@ -157,7 +157,7 @@ class YemotTranscriptionService:
             
             # תמלול הקובץ
             response = self.client.models.generate_content(
-                model='gemini-3.8-flash',
+                model='gemini-3.5-transcribe',
                 contents=[
                     "Transcribe the audio accurately. The audio may contain Aramaic, Hebrew, and/or Biblical Hebrew, possibly mixed together. Return ONLY the transcription text without any explanations, notes, or additional content.",
                     types.Part.from_uri(
@@ -248,24 +248,24 @@ def transcribe():
     נקודת קצה לתמלול - מורידה את הקובץ האחרון משלוחה 7 ומעלה את התמלול לשלוחה 8
     """
     try:
+        print("[DEBUG] Transcribe endpoint called")
         # קבלת הקובץ האחרון משלוחה 7
         latest_file = service.get_latest_file_from_extension('7')
         
         if not latest_file:
+            print("[DEBUG] No file found in extension 7")
             return "id_list_message=no_file_found"
         
-        # הודעה למשתמש שהקובץ נשלח לתמלול
-        # תמלול ברקע
-        def process_in_background():
-            print("[DEBUG] Starting background transcription process")
-            result = service.process_transcription('7', '8')
-            print(f"[DEBUG] Background transcription result: {result}")
+        print(f"[DEBUG] Latest file found: {latest_file}")
         
-        thread = threading.Thread(target=process_in_background)
-        thread.daemon = True
-        thread.start()
+        # תמלול סינכרוני לבדיקה
+        result = service.process_transcription('7', '8')
+        print(f"[DEBUG] Transcription result: {result}")
         
-        return "id_list_message=file_sent_for_transcription"
+        if result == "id_list_message=success":
+            return "id_list_message=file_sent_for_transcription"
+        else:
+            return result
         
     except Exception as e:
         print(f"[ERROR] שגיאה ב-transcribe: {e}")
