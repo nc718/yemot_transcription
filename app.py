@@ -174,26 +174,30 @@ class YemotTranscriptionService:
             
             # חילוץ התמלול מהתגובה
             logger.debug(f"Response type: {type(response)}")
-            logger.debug(f"Response attributes: {dir(response)}")
-            if response:
-                if hasattr(response, 'text') and response.text:
+            logger.debug(f"Response has text attribute: {hasattr(response, 'text')}")
+            if hasattr(response, 'text'):
+                logger.debug(f"Response.text value: {response.text}")
+                if response.text:
                     transcription = response.text.strip()
                     logger.debug(f"Transcription completed. Length: {len(transcription)} characters")
                     logger.debug(f"Transcription preview: {transcription[:100]}...")
                     return transcription
-                elif hasattr(response, 'candidates') and response.candidates:
-                    # נסה לקחת מ-candidates
-                    for candidate in response.candidates:
-                        if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                            for part in candidate.content.parts:
-                                if hasattr(part, 'text'):
-                                    transcription = part.text.strip()
-                                    logger.debug(f"Transcription from candidates. Length: {len(transcription)} characters")
-                                    logger.debug(f"Transcription preview: {transcription[:100]}...")
-                                    return transcription
-                logger.error(f"Response exists but no text found. Response: {response}")
-            else:
-                logger.error("No valid response from Gemini")
+                else:
+                    logger.debug("Response.text is empty, trying candidates")
+            if hasattr(response, 'candidates') and response.candidates:
+                logger.debug(f"Found {len(response.candidates)} candidates")
+                # נסה לקחת מ-candidates
+                for i, candidate in enumerate(response.candidates):
+                    logger.debug(f"Candidate {i}: {candidate}")
+                    if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                        for j, part in enumerate(candidate.content.parts):
+                            logger.debug(f"Part {j}: {part}")
+                            if hasattr(part, 'text') and part.text:
+                                transcription = part.text.strip()
+                                logger.debug(f"Transcription from candidates. Length: {len(transcription)} characters")
+                                logger.debug(f"Transcription preview: {transcription[:100]}...")
+                                return transcription
+            logger.error(f"Response exists but no text found. Response: {response}")
             return None
             
         except Exception as e:
