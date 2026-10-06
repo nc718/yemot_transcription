@@ -244,7 +244,7 @@ class YemotTranscriptionService:
             
             # יצירת שם קובץ עם timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            tts_filename = f"transcription_{timestamp}.txt"
+            tts_filename = f"transcription_{timestamp}.tts"
             
             # העלאת התמלול כקובץ TTS לשלוחת היעד
             upload_success = self.upload_tts_file(target_extension, tts_filename, transcription)
@@ -274,22 +274,25 @@ def transcribe():
         logger.debug("Transcribe endpoint called")
         # קבלת הקובץ האחרון משלוחה 7
         latest_file = service.get_latest_file_from_extension('7')
-        
+
         if not latest_file:
             logger.debug("No file found in extension 7")
             return "id_list_message=no_file_found"
-        
+
         logger.debug(f"Latest file found: {latest_file}")
-        
-        # תמלול סינכרוני לבדיקה
-        result = service.process_transcription('7', '8')
-        logger.debug(f"Transcription result: {result}")
-        
-        if result == "id_list_message=success":
-            return "id_list_message=file_sent_for_transcription"
-        else:
-            return result
-        
+
+        # תמלול ברקע
+        def process_in_background():
+            logger.debug("Starting background transcription process")
+            result = service.process_transcription('7', '8')
+            logger.debug(f"Background transcription result: {result}")
+
+        thread = threading.Thread(target=process_in_background)
+        thread.daemon = True
+        thread.start()
+
+        return "id_list_message=file_sent_for_transcription"
+
     except Exception as e:
         logger.error(f"שגיאה ב-transcribe: {e}")
         import traceback
