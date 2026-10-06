@@ -157,7 +157,7 @@ class YemotTranscriptionService:
             
             # תמלול הקובץ
             response = self.client.models.generate_content(
-                model='gemini-3.5-transcribe',
+                model='gemini-3.8-flash',
                 contents=[
                     "Transcribe the audio accurately. The audio may contain Aramaic, Hebrew, and/or Biblical Hebrew, possibly mixed together. Return ONLY the transcription text without any explanations, notes, or additional content.",
                     types.Part.from_uri(
