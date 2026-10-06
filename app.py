@@ -173,14 +173,28 @@ class YemotTranscriptionService:
             )
             
             # חילוץ התמלול מהתגובה
-            if response and hasattr(response, 'text'):
-                transcription = response.text.strip()
-                logger.debug(f"Transcription completed. Length: {len(transcription)} characters")
-                logger.debug(f"Transcription preview: {transcription[:100]}...")
-                return transcription
+            logger.debug(f"Response type: {type(response)}")
+            logger.debug(f"Response attributes: {dir(response)}")
+            if response:
+                if hasattr(response, 'text') and response.text:
+                    transcription = response.text.strip()
+                    logger.debug(f"Transcription completed. Length: {len(transcription)} characters")
+                    logger.debug(f"Transcription preview: {transcription[:100]}...")
+                    return transcription
+                elif hasattr(response, 'candidates') and response.candidates:
+                    # נסה לקחת מ-candidates
+                    for candidate in response.candidates:
+                        if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                            for part in candidate.content.parts:
+                                if hasattr(part, 'text'):
+                                    transcription = part.text.strip()
+                                    logger.debug(f"Transcription from candidates. Length: {len(transcription)} characters")
+                                    logger.debug(f"Transcription preview: {transcription[:100]}...")
+                                    return transcription
+                logger.error(f"Response exists but no text found. Response: {response}")
             else:
                 logger.error("No valid response from Gemini")
-                return None
+            return None
             
         except Exception as e:
             logger.error(f"שגיאה בתמלול: {e}")
